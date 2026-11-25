@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body { font-family: 'Sarabun', sans-serif; background: #f8fafc; }
+    .navbar-dark { background: #0f172a; }
+    .nav-link-custom { cursor: pointer; border-radius: 8px; margin: 2px 5px; text-align: center; color: rgba(255,255,255,0.7); text-decoration: none; padding: 0.5rem 1rem;}
+    .nav-link-custom.active { background: #334155 !important; color: white;}
+    .nav-link-custom:hover { color: white; }
+    .page-section { display: none; padding: 20px 0; }
+    .page-section.active { display: block; }
+    .status-badge { font-size: 11px; padding: 5px 10px; border-radius: 20px; display: inline-block; }
+    .report-print-area { background: white; padding: 20px; border-radius: 12px; }
+    .report-img { object-fit: cover; height: 250px; width: 100%; border-radius: 8px; }
+    .fc-event { cursor: pointer; }
+    .nav-tabs .nav-link { color: #475569; font-weight: 600; border-radius: 10px 10px 0 0; }
+    .nav-tabs .nav-link.active { color: #0f172a; border-bottom: 3px solid #3b82f6; }
+    .stat-card { border-radius: 16px; padding: 16px 18px; color: white; height: 100%; box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+    .stat-card .stat-label { font-size: 12px; opacity: 0.85; }
+    .stat-card .stat-value { font-size: 1.8rem; font-weight: 700; line-height: 1.2; }
+    .nav-badge { background: #ef4444; color: white; border-radius: 10px; font-size: 11px; padding: 1px 7px; margin-left: 4px; vertical-align: middle; }
+    tr.overdue-row td:first-child { color: #dc2626; font-weight: 700; }
+    tr.overdue-row td:first-child::after { content: " ⚠️"; }
+    @media (max-width: 768px) { .report-print-area { padding: 10px; } .report-img { height: 150px; } .fc-toolbar { flex-direction: column; gap: 10px; font-size: 0.9rem; } .stat-card .stat-value { font-size: 1.4rem; } }
+    @media print { .no-print { display: none !important; } body { background: white; } }
+    #reportModal .modal-dialog, #plcModal .modal-dialog { max-height: 92vh; }
+    #reportModal .modal-content, #plcModal .modal-content { max-height: 92vh; }
+    #reportModal .modal-body, #plcModal .modal-body { max-height: calc(92vh - 110px); overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
+      .text-teal { color: #0f766e; }
+    .plc-tab-btn { border-radius: 10px !important; font-weight: 600; font-size: 13px; color: #475569; background: #f1f5f9; border: none !important; padding: 8px 10px; }
+    .plc-tab-btn.active { background: #0d9488 !important; color: #fff !important; box-shadow: 0 4px 10px rgba(13,148,136,0.35); }
+    #plcModal .modal-dialog { max-width: 920px; }
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark no-print shadow-sm sticky-top">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="#">🎓 Krunick Workspace</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <div class="navbar-nav ms-auto mt-2 mt-lg-0">
+        <a class="nav-link-custom" id="nav-dashboard" onclick="showPage('dashboard')">🏠 แดชบอร์ด<span id="pendingBadge" class="nav-badge" style="display:none;"></span></a>
+        <a class="nav-link-custom active" id="nav-calendar" onclick="showPage('calendar')">📅 ปฏิทินงาน</a>
+        <a class="nav-link-custom" id="nav-plc" onclick="showPage('plc')">🤝 PLC</a>
+        <a class="nav-link-custom" id="nav-report" onclick="showPage('report')">📄 หน้ารายงานแยก</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-4">
+  <div id="dashboardPage" class="page-section">
+    <div class="row g-3 mb-3" id="summaryCards">
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="background: linear-gradient(135deg,#3b82f6,#2563eb);">
+          <div class="stat-label">📋 งานทั้งหมด</div>
+          <div class="stat-value" id="statTotal">0</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="background: linear-gradient(135deg,#10b981,#059669);">
+          <div class="stat-label">✅ เสร็จสิ้น</div>
+          <div class="stat-value" id="statDone">0</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="background: linear-gradient(135deg,#f59e0b,#d97706);">
+          <div class="stat-label">🕒 รอดำเนินการ</div>
+          <div class="stat-value" id="statPending">0</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card" style="background: linear-gradient(135deg,#8b5cf6,#7c3aed);">
+          <div class="stat-label">📈 ความคืบหน้า</div>
+          <div class="stat-value" id="statPercent">0%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 p-3 mb-3 bg-white">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold text-primary m-0">🎯 เป้าหมายรายด้าน</h6>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="editGoals()">✏️ ตั้งเป้าหมาย</button>
+      </div>
+      <div id="goalsContainer"><div class="text-muted small">กำลังโหลด...</div></div>
+    </div>
+
+    <div class="row">
+      <div class="col-12 col-lg-4 mb-4">
+        <div class="card shadow-sm border-0 rounded-4 mb-4 p-3 bg-white">
+           <h6 class="fw-bold text-primary mb-3">📈 สัดส่วนภาระงาน ว.PA</h6>
+           <div style="position: relative; height: 220px; width: 100%;"><canvas id="paChart"></canvas></div>
+        </div>
+        <div class="card shadow-sm border-0 rounded-4 mb-4 p-3 bg-white">
+           <h6 class="fw-bold text-primary mb-3">📅 จำนวนงานต่อเดือน</h6>
+           <div style="position: relative; height: 200px; width: 100%;"><canvas id="monthChart"></canvas></div>
+        </div>
+        <div class="card shadow-sm border-0 rounded-4">
+          <div class="card-body">
+            <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary" id="formHeader">📝 บันทึกภาระงานใหม่</h6>
+            <form id="taskForm" onsubmit="saveData(event, this)">
+              <input type="hidden" name="taskId" id="taskId">
+              <div class="mb-2"><label class="small">วันที่</label><input type="date" class="form-control form-control-sm" name="date" id="date" required></div>
+              <div class="mb-2"><label class="small">ปีการศึกษา</label><input type="number" class="form-control form-control-sm" name="academicYear" id="academicYear" required></div>
+              <div class="mb-2"><label class="small">ชื่องาน/คำสั่ง</label><input type="text" class="form-control form-control-sm" name="taskName" id="taskName" required></div>
+              <div class="mb-2"><label class="small">หมวดหมู่</label>
+                <select class="form-select form-select-sm" name="category" id="category">
+                  <option value="ด้านที่ 1 การจัดการเรียนรู้">ด้านที่ 1 การจัดการเรียนรู้</option>
+                  <option value="ด้านที่ 2 การส่งเสริมสนับสนุน">ด้านที่ 2 การส่งเสริมสนับสนุน</option>
+                  <option value="ด้านที่ 3 การพัฒนาตนเอง/วิชาชีพ">ด้านที่ 3 การพัฒนาตนเอง/วิชาชีพ</option>
+                  <option value="งานพิเศษ/หน้าที่อื่น">งานพิเศษ/หน้าที่อื่น</option>
+                </select>
+              </div>
+              <div class="mb-2"><label class="small">รายละเอียด</label><textarea class="form-control form-control-sm" name="description" id="description" rows="2"></textarea></div>
+              <div class="mb-3 p-2 border rounded bg-light">
+                <label class="small fw-bold text-primary mb-2">📂 แนบไฟล์หลักฐาน (สูงสุด 5 ไฟล์)</label>
+                <div class="d-flex flex-column gap-1">
+                  <div><input type="hidden" name="exFile1" id="exFile1"><input type="file" class="form-control form-control-sm" name="file1" id="file1"><div id="linkFile1"></div></div>
+                  <div><input type="hidden" name="exFile2" id="exFile2"><input type="file" class="form-control form-control-sm" name="file2" id="file2"><div id="linkFile2"></div></div>
+                  <div><input type="hidden" name="exFile3" id="exFile3"><input type="file" class="form-control form-control-sm" name="file3" id="file3"><div id="linkFile3"></div></div>
+                  <div><input type="hidden" name="exFile4" id="exFile4"><input type="file" class="form-control form-control-sm" name="file4" id="file4"><div id="linkFile4"></div></div>
+                  <div><input type="hidden" name="exFile5" id="exFile5"><input type="file" class="form-control form-control-sm" name="file5" id="file5"><div id="linkFile5"></div></div>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-dark btn-sm w-100 py-2" id="submitBtn">💾 บันทึกงาน</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" onclick="resetForm()">ล้างฟอร์ม</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-8">
+        <div class="card shadow-sm border-0 rounded-4 p-3">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+            <h6 class="fw-bold m-0">📊 รายการภาระงานทั้งหมด (ล่าสุดอยู่บนสุด)</h6>
+            <div class="d-flex gap-2 w-100 justify-content-md-end">
+              <input type="text" id="searchInput" class="form-control form-control-sm w-auto" placeholder="🔍 ค้นหาชื่องาน..." onkeyup="filterTable()">
+              <select class="form-select form-select-sm w-auto" id="categoryFilter" onchange="loadData()">
+                <option value="ทั้งหมด">ทุกหมวดหมู่</option>
+                <option value="ด้านที่ 1 การจัดการเรียนรู้">ด้านที่ 1</option>
+                <option value="ด้านที่ 2 การส่งเสริมสนับสนุน">ด้านที่ 2</option>
+                <option value="ด้านที่ 3 การพัฒนาตนเอง/วิชาชีพ">ด้านที่ 3</option>
+                <option value="งานพิเศษ/หน้าที่อื่น">งานพิเศษ</option>
+              </select>
+              <select class="form-select form-select-sm w-auto" id="yearFilter" onchange="loadData()"></select>
+            </div>
+          </div>
+
+          <ul class="nav nav-tabs mb-3" id="taskTabs" role="tablist">
+            <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pendingTab" type="button">🕒 รอดำเนินการ</button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#completedTab" type="button">✅ รายงานแล้ว</button></li>
+          </ul>
+
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="pendingTab" role="tabpanel">
+              <div class="table-responsive" style="max-height: 550px;"><table class="table table-hover align-middle"><thead class="table-light sticky-top"><tr><th>วันที่</th><th>ชื่องาน</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="taskListPending"></tbody></table></div>
+            </div>
+            <div class="tab-pane fade" id="completedTab" role="tabpanel">
+              <div class="table-responsive" style="max-height: 550px;"><table class="table table-hover align-middle"><thead class="table-light sticky-top"><tr><th>วันที่</th><th>ชื่องาน</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="taskListCompleted"></tbody></table></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="calendarPage" class="page-section active">
+    <div class="card shadow-sm border-0 rounded-4 p-3 bg-white"><div id="calendar"></div></div>
+  </div>
+
+  <div id="plcPage" class="page-section">
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-4">
+        <div class="stat-card" style="background: linear-gradient(135deg,#0d9488,#0f766e);">
+          <div class="stat-label">🤝 จำนวนครั้งที่ประชุม</div>
+          <div class="stat-value" id="plcStatCount">0</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4">
+        <div class="stat-card" style="background: linear-gradient(135deg,#f59e0b,#d97706);">
+          <div class="stat-label">⏱ ชั่วโมงสะสม</div>
+          <div class="stat-value" id="plcStatHours">0</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="stat-card" style="background: linear-gradient(135deg,#8b5cf6,#7c3aed);">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="stat-label">🎯 เป้าหมาย ชม./ปี</div>
+            <button type="button" class="btn btn-sm btn-light py-0 px-2" style="font-size:11px;" onclick="editPLCTarget()">แก้ไข</button>
+          </div>
+          <div class="stat-value" id="plcStatTarget">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 p-3 mb-3 bg-white">
+      <div class="d-flex justify-content-between small mb-1"><span class="fw-bold">ความคืบหน้าชั่วโมง PLC</span><span id="plcProgressLabel">0 / 0 ชม.</span></div>
+      <div class="progress" style="height:12px;"><div class="progress-bar bg-info" id="plcProgressBar" role="progressbar" style="width:0%;"></div></div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 p-3">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+        <h6 class="fw-bold m-0">🤝 บันทึกกิจกรรม PLC (ชุมชนแห่งการเรียนรู้ทางวิชาชีพ)</h6>
+        <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+          <select class="form-select form-select-sm w-auto" id="plcYearFilter" onchange="loadPLCData()"></select>
+          <button class="btn btn-dark btn-sm" onclick="openPLCModal()">➕ บันทึก PLC ใหม่</button>
+          <button class="btn btn-info text-white btn-sm" onclick="exportPLCReport()">📚 ออกรายงาน PLC (Word)</button>
+        </div>
+      </div>
+      <div class="table-responsive" style="max-height:550px;">
+        <table class="table table-hover align-middle">
+          <thead class="table-light sticky-top"><tr><th>ครั้งที่</th><th>วันที่</th><th>หัวข้อ/ประเด็น</th><th>ชั่วโมง</th><th>จัดการ</th></tr></thead>
+          <tbody id="plcList"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="reportPage" class="page-section">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2 no-print">
+      <h5 class="m-0">📄 สรุปรายงานกิจกรรม</h5>
+      <div class="d-flex flex-wrap gap-2">
+        <select class="form-select form-select-sm w-auto" id="reportYearFilter" onchange="loadReport()"></select>
+        <select class="form-select form-select-sm w-auto" id="reportCatFilter" onchange="loadReport()">
+           <option value="ทั้งหมด">ทุกหมวดหมู่ ว.PA</option>
+           <option value="ด้านที่ 1 การจัดการเรียนรู้">ด้านที่ 1 การจัดการเรียนรู้</option>
+           <option value="ด้านที่ 2 การส่งเสริมสนับสนุน">ด้านที่ 2 การส่งเสริมสนับสนุน</option>
+           <option value="ด้านที่ 3 การพัฒนาตนเอง/วิชาชีพ">ด้านที่ 3 การพัฒนาตนเอง/วิชาชีพ</option>
+           <option value="งานพิเศษ/หน้าที่อื่น">งานพิเศษ/หน้าที่อื่น</option>
+        </select>
+        <button class="btn btn-info text-white btn-sm w-100" onclick="exportPortfolio()">📚 พอร์ตโฟลิโอ Word</button>
+        <button class="btn btn-primary btn-sm w-100" onclick="window.print()">📥 สั่งพิมพ์ PDF</button>
+      </div>
+    </div>
+    <div class="report-print-area shadow-sm">
+      <div class="text-center mb-4"><h3 class="fw-bold fs-4">รายงานสรุปผลการปฏิบัติงาน</h3><p class="small text-muted mb-0">โรงเรียนวัดเชิงท่า | สพป.พระนครศรีอยุธยา เขต 2</p><hr></div>
+      <div id="reportContent"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="reportModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <form id="reportForm" onsubmit="submitReport(event, this)">
+        <div class="modal-header bg-dark text-white border-0"><h5 class="modal-title m-0 fs-6" id="reportModalTitle">📸 สรุปผลและภาพกิจกรรม</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body bg-light">
+          <input type="hidden" name="reportTaskId" id="reportTaskId">
+          <input type="hidden" name="existingImg1" id="existingImg1"><input type="hidden" name="existingImg2" id="existingImg2"><input type="hidden" name="existingImg3" id="existingImg3"><input type="hidden" name="existingImg4" id="existingImg4"><input type="hidden" name="existingImg5" id="existingImg5">
+          <div class="mb-3"><label class="form-label fw-bold text-primary small">📝 สรุปผลการดำเนินงาน</label><textarea class="form-control form-control-sm" name="reportSummary" id="reportSummary" rows="4" required></textarea></div>
+          <div class="row g-2">
+            <div class="col-6 col-md-4"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 1</label><input type="file" class="form-control form-control-sm" name="img1" accept="image/*"><div id="linkImg1"></div></div></div>
+            <div class="col-6 col-md-4"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 2</label><input type="file" class="form-control form-control-sm" name="img2" accept="image/*"><div id="linkImg2"></div></div></div>
+            <div class="col-6 col-md-4"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 3</label><input type="file" class="form-control form-control-sm" name="img3" accept="image/*"><div id="linkImg3"></div></div></div>
+            <div class="col-6 col-md-6"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 4</label><input type="file" class="form-control form-control-sm" name="img4" accept="image/*"><div id="linkImg4"></div></div></div>
+            <div class="col-12 col-md-6"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 5</label><input type="file" class="form-control form-control-sm" name="img5" accept="image/*"><div id="linkImg5"></div></div></div>
+          </div>
+        </div>
+        <div class="modal-footer border-0"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button><button type="submit" class="btn btn-success btn-sm px-4" id="btnSaveReport">💾 บันทึกรายงาน</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="plcModal">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius:18px; overflow:hidden;">
+      <form id="plcForm" onsubmit="savePLCForm(event, this)">
+        <div class="modal-header text-white border-0" style="background:linear-gradient(135deg,#0d9488,#0f766e);">
+          <h5 class="modal-title m-0 fs-6" id="plcModalTitle">🤝 บันทึกกิจกรรม PLC ใหม่</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <ul class="nav nav-pills nav-fill px-3 pt-3 pb-2 bg-white gap-2" id="plcModalTabs" role="tablist">
+          <li class="nav-item"><button class="nav-link active plc-tab-btn" type="button" data-bs-toggle="tab" data-bs-target="#plcTabGeneral">📝 ข้อมูลทั่วไป</button></li>
+          <li class="nav-item"><button class="nav-link plc-tab-btn" type="button" data-bs-toggle="tab" data-bs-target="#plcTabContent">💬 เนื้อหาการประชุม</button></li>
+          <li class="nav-item"><button class="nav-link plc-tab-btn" type="button" data-bs-toggle="tab" data-bs-target="#plcTabFiles">📎 แนบรูป/ไฟล์</button></li>
+        </ul>
+        <div class="modal-body bg-light pt-3">
+          <input type="hidden" name="plcId" id="plcId">
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="plcTabGeneral">
+              <div class="card border-0 shadow-sm p-3 mb-2">
+                <div class="row g-2 mb-2">
+                  <div class="col-md-6"><label class="small fw-bold text-teal">📅 วันที่ประชุม</label><input type="date" class="form-control form-control-sm" name="plcDate" id="plcDate" required></div>
+                  <div class="col-md-6"><label class="small fw-bold text-teal">#️⃣ ครั้งที่</label><input type="number" min="1" class="form-control form-control-sm" name="plcSession" id="plcSession" required></div>
+                </div>
+                <div class="row g-2 mb-2">
+                  <div class="col-md-4"><label class="small fw-bold text-teal">🎓 ปีการศึกษา</label><input type="number" class="form-control form-control-sm" name="plcYear" id="plcYear" required></div>
+                  <div class="col-md-4"><label class="small fw-bold text-teal">ภาคเรียน</label>
+                    <select class="form-select form-select-sm" name="plcSemester" id="plcSemester"><option value="1">1</option><option value="2">2</option></select>
+                  </div>
+                  <div class="col-md-4"><label class="small fw-bold text-teal">⏱ จำนวนชั่วโมง</label><input type="number" step="0.5" min="0" class="form-control form-control-sm" name="plcHours" id="plcHours" required></div>
+                </div>
+                <div class="row g-2">
+                  <div class="col-md-6"><label class="small fw-bold text-teal">👥 ชื่อกลุ่ม/ทีม PLC</label><input type="text" class="form-control form-control-sm" name="plcGroup" id="plcGroup"></div>
+                  <div class="col-md-6"><label class="small fw-bold text-teal">บทบาทของตนเอง</label>
+                    <select class="form-select form-select-sm" name="plcRole" id="plcRole">
+                      <option value="หัวหน้ากลุ่ม PLC">หัวหน้ากลุ่ม PLC</option>
+                      <option value="สมาชิกกลุ่ม PLC">สมาชิกกลุ่ม PLC</option>
+                      <option value="Model Teacher">Model Teacher</option>
+                      <option value="Buddy/Mentor">Buddy/Mentor</option>
+                      <option value="ผู้ทรงคุณวุฒิ/Expert">ผู้ทรงคุณวุฒิ/Expert</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="card border-0 shadow-sm p-3">
+                <label class="small fw-bold text-teal">🙋 สมาชิกที่เข้าร่วม (รายชื่อ)</label><textarea class="form-control form-control-sm" name="plcMembers" id="plcMembers" rows="3"></textarea>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="plcTabContent">
+              <div class="card border-0 shadow-sm p-3 mb-2">
+                <label class="small fw-bold text-teal">❓ ประเด็นปัญหา/หัวข้อที่ประชุม</label><textarea class="form-control form-control-sm mb-2" name="plcTopic" id="plcTopic" rows="2" required></textarea>
+                <label class="small fw-bold text-teal">🎯 เป้าหมายการพัฒนา</label><textarea class="form-control form-control-sm" name="plcGoal" id="plcGoal" rows="2"></textarea>
+              </div>
+              <div class="card border-0 shadow-sm p-3 mb-2">
+                <label class="small fw-bold text-teal">🗣️ กระบวนการ/สรุปการประชุม</label><textarea class="form-control form-control-sm mb-2" name="plcProcess" id="plcProcess" rows="3"></textarea>
+                <label class="small fw-bold text-teal">🤝 แนวทาง/ข้อตกลงที่ได้จากที่ประชุม</label><textarea class="form-control form-control-sm" name="plcSolution" id="plcSolution" rows="2"></textarea>
+              </div>
+              <div class="card border-0 shadow-sm p-3">
+                <label class="small fw-bold text-teal">✅ การนำไปใช้จริงและผลลัพธ์ที่เกิดขึ้น</label><textarea class="form-control form-control-sm" name="plcResult" id="plcResult" rows="3"></textarea>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="plcTabFiles">
+              <input type="hidden" name="exPlcImg1" id="exPlcImg1"><input type="hidden" name="exPlcImg2" id="exPlcImg2"><input type="hidden" name="exPlcImg3" id="exPlcImg3"><input type="hidden" name="exPlcImg4" id="exPlcImg4"><input type="hidden" name="exPlcImg5" id="exPlcImg5">
+              <div class="card border-0 shadow-sm p-3 mb-2">
+                <label class="small fw-bold text-teal mb-2">📸 ภาพประกอบกิจกรรม (สูงสุด 5 ภาพ)</label>
+                <div class="row g-2">
+                  <div class="col-6 col-md-4"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 1</label><input type="file" class="form-control form-control-sm" name="plcImg1" id="plcImg1" accept="image/*"><div id="linkPlcImg1"></div></div></div>
+                  <div class="col-6 col-md-4"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 2</label><input type="file" class="form-control form-control-sm" name="plcImg2" id="plcImg2" accept="image/*"><div id="linkPlcImg2"></div></div></div>
+                  <div class="col-6 col-md-4"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 3</label><input type="file" class="form-control form-control-sm" name="plcImg3" id="plcImg3" accept="image/*"><div id="linkPlcImg3"></div></div></div>
+                  <div class="col-6 col-md-6"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 4</label><input type="file" class="form-control form-control-sm" name="plcImg4" id="plcImg4" accept="image/*"><div id="linkPlcImg4"></div></div></div>
+                  <div class="col-12 col-md-6"><div class="card p-2 border-0 shadow-sm"><label class="small fw-bold">ภาพที่ 5</label><input type="file" class="form-control form-control-sm" name="plcImg5" id="plcImg5" accept="image/*"><div id="linkPlcImg5"></div></div></div>
+                </div>
+              </div>
+              <input type="hidden" name="exPlcFile1" id="exPlcFile1"><input type="hidden" name="exPlcFile2" id="exPlcFile2"><input type="hidden" name="exPlcFile3" id="exPlcFile3"><input type="hidden" name="exPlcFile4" id="exPlcFile4"><input type="hidden" name="exPlcFile5" id="exPlcFile5">
+              <div class="card border-0 shadow-sm p-3">
+                <label class="small fw-bold text-teal mb-2">📎 แนบไฟล์เอกสารหลักฐาน (เช่น ใบลงชื่อ/รายงาน สูงสุด 5 ไฟล์)</label>
+                <div class="row g-2">
+                  <div class="col-md-6"><label class="small">ไฟล์แนบ 1</label><input type="file" class="form-control form-control-sm" name="plcFile1" id="plcFile1"><div id="linkPlcFile1"></div></div>
+                  <div class="col-md-6"><label class="small">ไฟล์แนบ 2</label><input type="file" class="form-control form-control-sm" name="plcFile2" id="plcFile2"><div id="linkPlcFile2"></div></div>
+                  <div class="col-md-6"><label class="small">ไฟล์แนบ 3</label><input type="file" class="form-control form-control-sm" name="plcFile3" id="plcFile3"><div id="linkPlcFile3"></div></div>
+                  <div class="col-md-6"><label class="small">ไฟล์แนบ 4</label><input type="file" class="form-control form-control-sm" name="plcFile4" id="plcFile4"><div id="linkPlcFile4"></div></div>
+                  <div class="col-md-6"><label class="small">ไฟล์แนบ 5</label><input type="file" class="form-control form-control-sm" name="plcFile5" id="plcFile5"><div id="linkPlcFile5"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 bg-white"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button><button type="submit" class="btn btn-success btn-sm px-4" id="btnSavePLC">💾 บันทึก PLC</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="socialCardPreview" style="display: none; width: 1080px; height: 1920px; background: linear-gradient(135deg, #4f46e5 0%, #db2777 100%); position: fixed; top: -9999px; left: -9999px; flex-direction: column; padding: 60px; box-sizing: border-box; font-family: 'Sarabun', sans-serif;">
+  <div style="text-align: center; color: white; margin-bottom: 40px; margin-top: 30px;">
+     <div style="font-size: 36px; font-weight: 600; text-transform: uppercase; letter-spacing: 4px; opacity: 0.9;">Krunick Workspace</div>
+     <div id="sc-title" style="font-size: 75px; font-weight: bold; margin-top: 15px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"></div>
+     <div id="sc-date" style="font-size: 34px; background: rgba(255,255,255,0.2); display: inline-block; padding: 12px 35px; border-radius: 40px; margin-top: 25px; font-weight: bold;"></div>
+  </div>
+  <div id="sc-collage" style="flex: 1; margin-bottom: 40px; border-radius: 40px; overflow: hidden; background: rgba(255,255,255,0.15); padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.3);"></div>
+  <div style="background: white; border-radius: 40px; padding: 60px 60px 50px 60px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); position: relative;">
+     <span style="position: absolute; top: -35px; right: 60px; background: #FF3366; color: white; font-size: 32px; font-weight: bold; padding: 15px 45px; border-radius: 40px; box-shadow: 0 10px 25px rgba(255,51,102,0.5);">🎯 สรุปผลงาน</span>
+     <div id="sc-summary" style="font-size: 42px; color: #334155; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;"></div>
+     <hr style="margin: 40px 0 30px 0; border-top: 3px dashed #e2e8f0;">
+     <div style="display: flex; justify-content: space-between; align-items: center;"><div style="font-size: 36px; color: #64748b; font-weight: bold;">🏫 โรงเรียนวัดเชิงท่า</div><div style="font-size: 36px; color: #db2777; font-weight: bold;">#วPA #ครูนิค</div></div>
+  </div>
+</div>
+
+<script>
+  var allTasks = []; var calendar; var reportModal; var paChartInstance = null; var monthChartInstance = null;
+  var currentTargets = {}; var currentGoalCounts = null;
+  var allPLC = []; var plcModal; var currentPLCTarget = 50;
+  const CATEGORY_LIST = ['ด้านที่ 1 การจัดการเรียนรู้', 'ด้านที่ 2 การส่งเสริมสนับสนุน', 'ด้านที่ 3 การพัฒนาตนเอง/วิชาชีพ', 'งานพิเศษ/หน้าที่อื่น'];
+
+  window.onload = function() {
+    reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+    plcModal = new bootstrap.Modal(document.getElementById('plcModal'));
+    updateYearList(); loadData(); initCalendar(); loadTargets();
+    updatePLCYearList(); loadPLCTarget(); loadPLCData();
+  };
+
+  function showPage(pageId) {
+    var navbarCollapse = document.getElementById('navbarNav');
+    if(navbarCollapse.classList.contains('show')) new bootstrap.Collapse(navbarCollapse, {toggle: false}).hide();
+    document.querySelectorAll('.page-section').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.nav-link-custom').forEach(function(n) { n.classList.remove('active'); });
+    document.getElementById(pageId + 'Page').classList.add('active'); document.getElementById('nav-' + pageId).classList.add('active');
+    if(pageId === 'calendar') setTimeout(function() { initCalendar(); }, 150);
+    if(pageId === 'report') loadReport();
+    if(pageId === 'plc') loadPLCData();
+  }
+
+  function getSortableDate(dateStr) {
+    if (!dateStr) return 0;
+    if (dateStr.includes('/')) { var parts = dateStr.split('/'); return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])).getTime(); }
+    else if (dateStr.includes('-')) { return new Date(dateStr).getTime(); } return 0;
+  }
+
+  function isOverdue(t) {
+    if (t['สถานะ'] === 'เสร็จสิ้น') return false;
+    var ts = getSortableDate(t['วันที่']);
+    if (!ts) return false;
+    var today = new Date(); today.setHours(0,0,0,0);
+    return ts < today.getTime();
+  }
+
+  function initCalendar() {
+    var el = document.getElementById('calendar'); if(calendar) calendar.destroy();
+    google.script.run.withSuccessHandler(function(ev) {
+      calendar = new FullCalendar.Calendar(el, {
+        initialView: 'dayGridMonth', locale: 'th', events: ev, height: 'auto', headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
+        dateClick: function(info) { resetForm(); document.getElementById('date').value = info.dateStr; showPage('dashboard'); },
+        eventClick: function(info) {
+          const props = info.event.extendedProps; let fileLinksHtml = '';
+          if (props.fileUrl) { let urls = props.fileUrl.split(" | "); let count = 1; urls.forEach(function(url) { if(url.trim() !== "") { fileLinksHtml += `<a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary m-1">🔗 ไฟล์ ${count}</a>`; count++; } }); }
+          const isDone = props.status === 'เสร็จสิ้น';
+          const reportBtnText = isDone ? '📝 แก้ไขรายงาน' : '📸 สรุปผล/รายงาน';
+          const reportBtnClass = isDone ? 'btn-outline-success' : 'btn-success';
+          Swal.fire({
+            title: info.event.title,
+            html: `<div class="text-start"><p class="mb-1"><b>📅 วันที่:</b> ${info.event.startStr}</p><p class="mb-1"><b>📂 หมวดหมู่:</b> ${props.category}</p><p class="mb-1"><b>🎓 ปีการศึกษา:</b> ${props.academicYear}</p><p class="mb-2"><b>สถานะ:</b> <span class="status-badge ${isDone ? 'bg-success' : 'bg-warning text-dark'}">${props.status}</span></p>${fileLinksHtml ? `<div class="mt-2 border-top pt-2 mb-2"><b>ไฟล์แนบ:</b><br>${fileLinksHtml}</div>` : ''}<div class="d-flex mt-3"><button type="button" class="btn ${reportBtnClass} btn-sm w-100 fw-bold" onclick="Swal.close(); openReportModal('${info.event.id}');">${reportBtnText}</button></div><div class="d-flex gap-2 mt-2"><button type="button" class="btn btn-outline-primary btn-sm w-50" onclick="Swal.close(); editTask('${info.event.id}');">✏️ แก้ไขงาน</button><button type="button" class="btn btn-outline-danger btn-sm w-50" onclick="Swal.close(); confirmDelete('${info.event.id}');">🗑️ ลบงาน</button></div></div>`,
+            showConfirmButton: false,
+            showCloseButton: true
+          });
+        }
+      }); calendar.render();
+    }).getCalendarEvents();
+  }
+
+  function generateTableRows(taskArray, isCompletedTab) {
+    if(taskArray.length === 0) return '<tr><td colspan="4" class="text-center text-muted py-4">ไม่มีรายการงาน</td></tr>';
+    return taskArray.map(function(t) {
+      var sc = t['สถานะ'] === 'เสร็จสิ้น' ? 'bg-success' : 'bg-warning text-dark';
+      var btnText = t['สถานะ'] === 'เสร็จสิ้น' ? '📝 แก้ไขรายงาน' : '📸 สรุปผล';
+      var rowClass = isOverdue(t) ? ' class="overdue-row"' : '';
+
+      var actionButtons = isCompletedTab ? `
+        <div class="d-flex gap-1 mb-1">
+          <button class="btn btn-sm btn-primary w-50 fw-bold" onclick="generateStoryCard('${t['ID']}')" title="โหลดรูปลง Story">📱 Story</button>
+          <button class="btn btn-sm btn-info text-white w-50 fw-bold" onclick="exportDocs('${t['ID']}')" title="สร้างเป็น Google Docs">📄 Docs</button>
+        </div>` : '';
+
+      return `<tr${rowClass}><td class="small fw-bold">${t['วันที่']}</td><td class="text-wrap" style="min-width:150px;"><div class="fw-bold text-dark">${t['ชื่องาน/โครงการ']}</div><div class="small text-muted">${t['หมวดหมู่ ว.PA'] || '-'}</div></td><td><span class="status-badge ${sc}">${t['สถานะ']}</span></td><td><div class="d-flex flex-column gap-1">${actionButtons}<button class="btn btn-sm btn-outline-success" onclick="openReportModal('${t['ID']}')">${btnText}</button><div class="d-flex gap-1"><button class="btn btn-sm btn-light border w-50" onclick="editTask('${t['ID']}')">✏️</button><button class="btn btn-sm btn-light border text-danger w-50" onclick="confirmDelete('${t['ID']}')">🗑️</button></div></div></td></tr>`;
+    }).join('');
+  }
+
+  function updateChart(tasks) {
+    const counts = { 'ด้านที่ 1 การจัดการเรียนรู้': 0, 'ด้านที่ 2 การส่งเสริมสนับสนุน': 0, 'ด้านที่ 3 การพัฒนาตนเอง/วิชาชีพ': 0, 'งานพิเศษ/หน้าที่อื่น': 0 };
+    tasks.forEach(function(t) { var cat = t['หมวดหมู่ ว.PA']; if(counts[cat] !== undefined) counts[cat]++; });
+    var ctx = document.getElementById('paChart').getContext('2d'); if(paChartInstance) paChartInstance.destroy();
+    paChartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { family: 'Sarabun' }, boxWidth: 15 } } }, cutout: '60%' } });
+  }
+
+  function updateSummaryCards(tasks) {
+    var total = tasks.length;
+    var done = tasks.filter(function(t) { return t['สถานะ'] === 'เสร็จสิ้น'; }).length;
+    var pending = total - done;
+    var percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById('statTotal').innerText = total;
+    document.getElementById('statDone').innerText = done;
+    document.getElementById('statPending').innerText = pending;
+    document.getElementById('statPercent').innerText = percent + '%';
+    var badge = document.getElementById('pendingBadge');
+    if (pending > 0) { badge.style.display = 'inline-block'; badge.innerText = pending; } else { badge.style.display = 'none'; }
+  }
+
+  function updateMonthChart(tasks) {
+    var counts = {};
+    tasks.forEach(function(t) {
+      var d = t['วันที่']; var key = '';
+      if (d && d.includes('/')) { var p = d.split('/'); key = p[2] + '-' + String(p[1]).padStart(2, '0'); }
+      else if (d && d.includes('-')) { key = d.substring(0, 7); }
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    });
+    var labels = Object.keys(counts).sort();
+    var data = labels.map(function(k) { return counts[k]; });
+    var ctx = document.getElementById('monthChart').getContext('2d');
+    if (monthChartInstance) monthChartInstance.destroy();
+    monthChartInstance = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'จำนวนงาน', data: data, backgroundColor: '#3b82f6', borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
+  }
+
+  function filterTable() {
+    var input = document.getElementById('searchInput').value.toLowerCase();
+    var rows = document.querySelectorAll('#taskListPending tr, #taskListCompleted tr');
+    rows.forEach(function(row) { if(row.innerText.includes('ไม่มีรายการงาน')) return; var text = row.innerText.toLowerCase(); row.style.display = text.includes(input) ? '' : 'none'; });
+  }
+
+  function loadData() {
+    var year = document.getElementById('yearFilter').value;
+    var catEl = document.getElementById('categoryFilter');
+    var cat = catEl ? catEl.value : 'ทั้งหมด';
+    google.script.run.withSuccessHandler(function(tasks) {
+      allTasks = tasks; updateChart(tasks); updateSummaryCards(tasks); updateMonthChart(tasks); updateGoals(tasks);
+      var filtered = (cat && cat !== 'ทั้งหมด') ? tasks.filter(function(t) { return t['หมวดหมู่ ว.PA'] === cat; }) : tasks.slice();
+      filtered.sort(function(a, b) { return getSortableDate(b['วันที่']) - getSortableDate(a['วันที่']); });
+      var pendingTasks = filtered.filter(function(t) { return t['สถานะ'] !== 'เสร็จสิ้น'; }); var completedTasks = filtered.filter(function(t) { return t['สถานะ'] === 'เสร็จสิ้น'; });
+      document.getElementById('taskListPending').innerHTML = generateTableRows(pendingTasks, false); document.getElementById('taskListCompleted').innerHTML = generateTableRows(completedTasks, true);
+      document.getElementById('searchInput').value = "";
+    }).getTasks(year, "ทั้งหมด");
+  }
+
+  function updateGoals(tasks) {
+    var counts = {};
+    CATEGORY_LIST.forEach(function(c) { counts[c] = 0; });
+    tasks.forEach(function(t) { var cat = t['หมวดหมู่ ว.PA']; if (counts[cat] !== undefined) counts[cat]++; });
+    currentGoalCounts = counts;
+    renderGoals(counts, currentTargets);
+  }
+
+  function renderGoals(counts, targets) {
+    var container = document.getElementById('goalsContainer');
+    var colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+    var html = '';
+    CATEGORY_LIST.forEach(function(cat, i) {
+      var count = counts[cat] || 0;
+      var target = (targets && targets[cat]) || 0;
+      var pct = target > 0 ? Math.min(100, Math.round((count / target) * 100)) : (count > 0 ? 100 : 0);
+      html += '<div class="mb-2">' +
+        '<div class="d-flex justify-content-between small mb-1"><span class="fw-bold">' + cat + '</span><span>' + count + (target > 0 ? ' / ' + target : '') + '</span></div>' +
+        '<div class="progress" style="height:10px;"><div class="progress-bar" role="progressbar" style="width:' + pct + '%; background:' + colors[i] + ';"></div></div>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function loadTargets() {
+    google.script.run.withSuccessHandler(function(t) {
+      currentTargets = t || {};
+      if (currentGoalCounts) renderGoals(currentGoalCounts, currentTargets);
+    }).getTargets();
+  }
+
+  function editGoals() {
+    var t = currentTargets || {};
+    Swal.fire({
+      title: '🎯 ตั้งเป้าหมายรายด้าน',
+      html: CATEGORY_LIST.map(function(c, i) {
+        return '<div class="mb-2 text-start"><label class="small fw-bold">' + c + '</label><input type="number" min="0" class="form-control form-control-sm" id="goalInput' + i + '" value="' + (t[c] || 0) + '"></div>';
+      }).join(''),
+      showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#0d6efd',
+      preConfirm: function() {
+        var newTargets = {};
+        CATEGORY_LIST.forEach(function(c, i) { newTargets[c] = parseInt(document.getElementById('goalInput' + i).value, 10) || 0; });
+        return newTargets;
+      }
+    }).then(function(result) {
+      if (result.isConfirmed) {
+        google.script.run.withSuccessHandler(function() {
+          currentTargets = result.value;
+          if (currentGoalCounts) renderGoals(currentGoalCounts, currentTargets);
+          Swal.fire({ title: 'บันทึกเป้าหมายแล้ว', icon: 'success', timer: 1200, showConfirmButton: false });
+        }).withFailureHandler(function(err) { Swal.fire('เกิดข้อผิดพลาด', err.message, 'error'); }).saveTargets(result.value);
+      }
+    });
+  }
+
+  function exportPortfolio() {
+    var year = document.getElementById('reportYearFilter').value;
+    Swal.fire({ title: 'กำลังสร้างพอร์ตโฟลิโอ...', text: 'รวบรวมงานทั้งหมดและรูปภาพ อาจใช้เวลาสักครู่ 📚✨', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+    google.script.run.withSuccessHandler(function(url) {
+      Swal.fire({
+        title: 'สร้างพอร์ตโฟลิโอสำเร็จ! 🎉', text: 'เปิดไฟล์ Word เพื่อดาวน์โหลดหรือส่งประเมินได้เลยครับ', icon: 'success', showCancelButton: true, confirmButtonText: 'เปิดไฟล์', cancelButtonText: 'ปิดหน้าต่าง', confirmButtonColor: '#0ea5e9'
+      }).then(function(result) { if (result.isConfirmed) { window.open(url, '_blank'); } });
+    }).withFailureHandler(function(err) { Swal.fire('เกิดข้อผิดพลาด', err.message, 'error'); }).exportPortfolioToDoc(year);
+  }
+
+  function loadReport() {
+    var year = document.getElementById('reportYearFilter').value; var cat = document.getElementById('reportCatFilter').value;
+    google.script.run.withSuccessHandler(function(tasks) {
+      var cont = document.getElementById('reportContent'); var fin = tasks.filter(function(t) { return t['สถานะ'] === 'เสร็จสิ้น'; }); fin.sort(function(a, b) { return getSortableDate(b['วันที่']) - getSortableDate(a['วันที่']); });
+      if(fin.length === 0) { cont.innerHTML = '<div class="text-center text-muted mt-4">ไม่มีรายงานในหมวดหมู่นี้</div>'; return; }
+      cont.innerHTML = fin.map(function(t) {
+        var imagesHtml = ''; for(var i=1; i<=5; i++) { if(t['ภาพที่ '+i]) { var directUrl = "https://drive.google.com/thumbnail?id=" + t['ภาพที่ '+i].match(/\/d\/([a-zA-Z0-9-_]+)/)[1] + "&sz=w800"; imagesHtml += '<div class="col-6 col-md-4"><img src="' + directUrl + '" class="img-fluid border shadow-sm report-img"></div>'; } }
+        return `<div class="mb-4 border-bottom pb-4 page-break-inside-avoid"><h5 class="fw-bold text-primary fs-6">📌 ${t['ชื่องาน/โครงการ']}</h5><p class="small mb-1">📅 วันที่: ${t['วันที่']} | 📂 ${t['หมวดหมู่ ว.PA']}</p><p class="mb-2 small"><strong>ผลงาน:</strong> ${t['สรุปผลการดำเนินงาน']}</p><div class="row g-2">${imagesHtml}</div></div>`;
+      }).join('');
+    }).getTasks(year, cat);
+  }
+
+  function exportDocs(id) {
+    Swal.fire({
+      title: 'กำลังสร้างเอกสาร Docs...', text: 'ระบบกำลังนำข้อมูลและรูปภาพไปจัดหน้ากระดาษ รอสักครู่นะครับ 📄✨', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); }
+    });
+    google.script.run.withSuccessHandler(function(url) {
+        Swal.fire({
+          title: 'สร้างเอกสารสำเร็จ! 🎉', text: 'คุณครูสามารถคลิกปุ่มด้านล่างเพื่อเปิดและดาวน์โหลดเป็นไฟล์ Word (.docx) ได้เลยครับ', icon: 'success', showCancelButton: true, confirmButtonText: 'เปิดไฟล์ Docs', cancelButtonText: 'ปิดหน้าต่าง', confirmButtonColor: '#0ea5e9'
+        }).then((result) => { if (result.isConfirmed) { window.open(url, '_blank'); } });
+      }).withFailureHandler(function(err) { Swal.fire('เกิดข้อผิดพลาด', err.message, 'error'); }).exportToDoc(id);
+  }
+
+  function buildCollageHtml(base64Array) {
+    let count = base64Array.length; let html = ''; const styleImg = 'width:100%; height:100%; object-fit:cover; border-radius: 25px; box-shadow: 0 10px 20px rgba(0,0,0,0.15);';
+    if (count === 1) { html = `<img src="${base64Array[0]}" style="${styleImg}">`; }
+    else if (count === 2) { html = `<div style="display:flex; height:100%; gap:20px;"><div style="flex:1;"><img src="${base64Array[0]}" style="${styleImg}"></div><div style="flex:1;"><img src="${base64Array[1]}" style="${styleImg}"></div></div>`; }
+    else if (count === 3) { html = `<div style="display:flex; flex-direction:column; height:100%; gap:20px;"><div style="flex:1.2;"><img src="${base64Array[0]}" style="${styleImg}"></div><div style="display:flex; flex:1; gap:20px;"><div style="flex:1;"><img src="${base64Array[1]}" style="${styleImg}"></div><div style="flex:1;"><img src="${base64Array[2]}" style="${styleImg}"></div></div></div>`; }
+    else if (count === 4) { html = `<div style="display:grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap:20px; height:100%;"><img src="${base64Array[0]}" style="${styleImg}"><img src="${base64Array[1]}" style="${styleImg}"><img src="${base64Array[2]}" style="${styleImg}"><img src="${base64Array[3]}" style="${styleImg}"></div>`; }
+    else { html = `<div style="display:flex; flex-direction:column; height:100%; gap:20px;"><div style="flex:1;"><img src="${base64Array[0]}" style="${styleImg}"></div><div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:15px; flex:0.6;"><img src="${base64Array[1]}" style="${styleImg}"><img src="${base64Array[2]}" style="${styleImg}"><img src="${base64Array[3]}" style="${styleImg}"><img src="${base64Array[4]}" style="${styleImg}"></div></div>`; }
+    return html;
+  }
+
+  function generateStoryCard(id) {
+    var t = allTasks.find(function(x) { return x['ID'] === id; }); if(!t) return;
+    let imageUrls = []; for(let i=1; i<=5; i++) { if(t['ภาพที่ '+i]) imageUrls.push(t['ภาพที่ '+i]); }
+    if(imageUrls.length === 0) { Swal.fire('ไม่มีรูปภาพ 🖼️', 'กรุณาแนบรูปภาพอย่างน้อย 1 รูป', 'warning'); return; }
+    Swal.fire({ title: 'กำลังเนรมิตการ์ดใหม่...', text: 'รอสักครู่นะครับ 🎨✨', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+    document.getElementById('sc-title').innerText = t['ชื่องาน/โครงการ']; document.getElementById('sc-date').innerText = '📅 ' + t['วันที่'] + ' | 📂 ' + (t['หมวดหมู่ ว.PA'] || 'งานทั่วไป');
+    var summary = t['สรุปผลการดำเนินงาน'] && t['สรุปผลการดำเนินงาน'] !== 'undefined' ? t['สรุปผลการดำเนินงาน'] : 'สำเร็จลุล่วงตามวัตถุประสงค์'; document.getElementById('sc-summary').innerText = summary;
+    google.script.run.withSuccessHandler(function(base64Array) {
+         if(!base64Array || base64Array.length === 0) { Swal.fire('เกิดข้อผิดพลาด', 'ดึงภาพไม่ได้ครับ', 'error'); return; }
+         document.getElementById('sc-collage').innerHTML = buildCollageHtml(base64Array);
+         var card = document.getElementById('socialCardPreview'); card.style.display = 'flex';
+         setTimeout(function() {
+           html2canvas(card, { scale: 1, useCORS: true, backgroundColor: "#f1f5f9" }).then(function(canvas) {
+             card.style.display = 'none'; var link = document.createElement('a'); link.download = 'PA_Story_' + t['วันที่'] + '.jpg'; link.href = canvas.toDataURL('image/jpeg', 0.9); link.click(); Swal.fire('สำเร็จ! 🎉', 'รูปการ์ดพร้อมแชร์แล้วครับ!', 'success');
+           }).catch(function(err) { card.style.display = 'none'; Swal.fire('เกิดข้อผิดพลาด', err.message, 'error'); });
+         }, 1000);
+      }).withFailureHandler(function(err) { Swal.fire('เกิดข้อผิดพลาด', err.message, 'error'); }).getMultipleBase64FromDriveUrls(imageUrls);
+  }
+
+  function updateYearList() {
+    google.script.run.withSuccessHandler(function(y) {
+      var dash = document.getElementById('yearFilter'); var rep = document.getElementById('reportYearFilter');
+      var html = '<option value="ทั้งหมด">ทุกปีการศึกษา</option>' + y.map(function(i) { return '<option value="' + i + '">ปี ' + i + '</option>'; }).join('');
+      dash.innerHTML = html; rep.innerHTML = html;
+    }).getYears();
+  }
+
+  function saveData(e, form) {
+    e.preventDefault(); var filesArray = [form.file1, form.file2, form.file3, form.file4, form.file5];
+    for(var i=0; i<5; i++){ if(filesArray[i].files.length > 0 && filesArray[i].files[0].size > 10 * 1024 * 1024) { Swal.fire('ไฟล์ใหญ่เกินไป', 'ไฟล์ที่ ' + (i+1) + ' มีขนาดเกิน 10MB', 'warning'); return; } }
+    Swal.fire({ title: 'กำลังบันทึก...', text: 'การอัปโหลดหลายไฟล์อาจใช้เวลาสักครู่', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+    google.script.run.withSuccessHandler(function(res) { Swal.fire('สำเร็จ', res, 'success'); resetForm(); loadData(); updateYearList(); showPage('dashboard'); }).withFailureHandler(function(err) { Swal.fire('ล้มเหลว', err.message, 'error'); }).processForm(form);
+  }
+
+  function submitReport(e, form) {
+    e.preventDefault(); document.getElementById('btnSaveReport').disabled = true;
+    google.script.run.withSuccessHandler(function(res) { reportModal.hide(); Swal.fire('สำเร็จ!', res, 'success'); loadData(); document.getElementById('btnSaveReport').disabled = false; }).saveTaskReport(form);
+  }
+
+  function openReportModal(id) {
+    var t = allTasks.find(function(x) { return x['ID'] === id; });
+    if(t) {
+      document.getElementById('reportTaskId').value = t['ID']; document.getElementById('reportModalTitle').innerText = "📸 รายงาน: " + t['ชื่องาน/โครงการ'];
+      document.getElementById('reportSummary').value = (t['สรุปผลการดำเนินงาน'] && t['สรุปผลการดำเนินงาน'] !== 'undefined') ? t['สรุปผลการดำเนินงาน'] : "";
+      for(var i=1; i<=5; i++) { var url = t['ภาพที่ ' + i]; document.getElementById('existingImg' + i).value = url || ""; document.getElementById('linkImg' + i).innerHTML = url ? '<a href="' + url + '" target="_blank" class="badge bg-info image-link-badge">ดูภาพเดิม</a>' : ""; }
+      reportModal.show();
+    }
+  }
+
+  function editTask(id) {
+    var t = allTasks.find(function(x) { return x['ID'] === id; }); if(!t) { loadData(); setTimeout(function(){ editTask(id); }, 500); return; }
+    document.getElementById('taskId').value = t['ID'];
+    var d = t['วันที่']; if(d.includes('/')) { var p = d.split('/'); d = p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0'); }
+    document.getElementById('date').value = d; document.getElementById('taskName').value = t['ชื่องาน/โครงการ']; document.getElementById('academicYear').value = t['ปีการศึกษา']; document.getElementById('category').value = t['หมวดหมู่ ว.PA'] || "งานพิเศษ/หน้าที่อื่น"; document.getElementById('description').value = t['รายละเอียด'];
+    var urls = t['ลิงก์ไฟล์แนบ'] ? t['ลิงก์ไฟล์แนบ'].split(" | ") : ["","","","",""];
+    for(var i=1; i<=5; i++) { var u = urls[i-1] || ""; document.getElementById('exFile' + i).value = u; document.getElementById('linkFile' + i).innerHTML = u ? '<a href="' + u + '" target="_blank" class="badge bg-info image-link-badge mt-1 mb-2">📄 ดูไฟล์เดิม</a>' : ""; }
+    document.getElementById('formHeader').innerText = "✏️ แก้ไขงาน: " + t['ชื่องาน/โครงการ']; document.getElementById('submitBtn').innerHTML = "✅ อัปเดตงาน"; showPage('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function confirmDelete(id) {
+    Swal.fire({ title: 'ยืนยันการลบ?', text: "ลบแล้วกู้คืนไม่ได้นะครับ", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'ลบเลย', cancelButtonText: 'ยกเลิก' }).then(function(r) { if(r.isConfirmed) google.script.run.withSuccessHandler(function() { Swal.fire('ลบแล้ว!', '', 'success'); loadData(); updateYearList(); }).deleteTask(id); });
+  }
+
+  function resetForm() {
+    document.getElementById('taskForm').reset(); document.getElementById('taskId').value = "";
+    document.getElementById('formHeader').innerText = "📝 บันทึกภาระงานใหม่"; document.getElementById('submitBtn').innerHTML = "💾 บันทึกงาน";
+    for(var i=1; i<=5; i++) { document.getElementById('exFile' + i).value = ""; document.getElementById('linkFile' + i).innerHTML = ""; }
+  }
+
+  // ============================================================
+  // 🤝 PLC (ชุมชนแห่งการเรียนรู้ทางวิชาชีพ)
+  // ============================================================
+
+  function updatePLCYearList() {
+    google.script.run.withSuccessHandler(function(y) {
+      var el = document.getElementById('plcYearFilter');
+      el.innerHTML = '<option value="ทั้งหมด">ทุกปีการศึกษา</option>' + y.map(function(i) { return '<option value="' + i + '">ปี ' + i + '</option>'; }).join('');
+    }).getPLCYears();
+  }
+
+  function loadPLCData() {
+    var year = document.getElementById('plcYearFilter').value;
+    google.script.run.withSuccessHandler(function(records) {
+      allPLC = records;
+      records.sort(function(a, b) { return getSortableDate(b['วันที่']) - getSortableDate(a['วันที่']); });
+      document.getElementById('plcList').innerHTML = generatePLCRows(records);
+      updatePLCSummary(records);
+    }).getPLCRecords(year);
+  }
+
+  function generatePLCRows(records) {
+    if (records.length === 0) return '<tr><td colspan="5" class="text-center text-muted py-4">ยังไม่มีบันทึก PLC</td></tr>';
+    return records.map(function(r) {
+      return '<tr><td class="fw-bold">' + (r['ครั้งที่'] || '-') + '</td><td class="small">' + r['วันที่'] + '</td><td class="text-wrap" style="min-width:180px;">' + (r['ประเด็นปัญหา/หัวข้อที่ประชุม'] || '-') + '</td><td>' + (r['จำนวนชั่วโมง'] || 0) + '</td>' +
+        '<td><div class="d-flex gap-1"><button class="btn btn-sm btn-light border" onclick="openPLCModal(\'' + r['ID'] + '\')">✏️</button><button class="btn btn-sm btn-light border text-danger" onclick="confirmDeletePLC(\'' + r['ID'] + '\')">🗑️</button></div></td></tr>';
+    }).join('');
+  }
+
+  function updatePLCSummary(records) {
+    var count = records.length;
+    var hours = records.reduce(function(sum, r) { return sum + (parseFloat(r['จำนวนชั่วโมง']) || 0); }, 0);
+    document.getElementById('plcStatCount').innerText = count;
+    document.getElementById('plcStatHours').innerText = hours;
+    document.getElementById('plcStatTarget').innerText = currentPLCTarget;
+    var pct = currentPLCTarget > 0 ? Math.min(100, Math.round((hours / currentPLCTarget) * 100)) : 0;
+    document.getElementById('plcProgressBar').style.width = pct + '%';
+    document.getElementById('plcProgressLabel').innerText = hours + ' / ' + currentPLCTarget + ' ชม.';
+  }
+
+  function loadPLCTarget() {
+    google.script.run.withSuccessHandler(function(t) {
+      currentPLCTarget = t || 50;
+      updatePLCSummary(allPLC);
+    }).getPLCTarget();
+  }
+
+  function editPLCTarget() {
+    Swal.fire({
+      title: '🎯 ตั้งเป้าหมายชั่วโมง PLC ต่อปี', input: 'number', inputValue: currentPLCTarget,
+      showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#0d6efd'
+    }).then(function(result) {
+      if (result.isConfirmed && result.value) {
+        google.script.run.withSuccessHandler(function() {
+          currentPLCTarget = parseFloat(result.value);
+          updatePLCSummary(allPLC);
+          Swal.fire({ title: 'บันทึกเป้าหมายแล้ว', icon: 'success', timer: 1200, showConfirmButton: false });
+        }).withFailureHandler(function(err) { Swal.fire('เกิดข้อผิดพลาด', err.message, 'error'); }).savePLCTarget(parseFloat(result.value));
+      }
+    });
+  }
+
+  function openPLCModal(id) {
+    document.getElementById('plcForm').reset();
+    document.getElementById('plcId').value = '';
+    document.getElementById('plcModalTitle').innerText = '🤝 บันทึกกิจกรรม PLC ใหม่';
+    document.getElementById('btnSavePLC').innerHTML = '💾 บันทึก PLC';
+    for (var i = 1; i <= 5; i++) { document.getElementById('exPlcImg' + i).value = ''; document.getElementById('linkPlcImg' + i).innerHTML = ''; document.getElementById('exPlcFile' + i).value = ''; document.getElementById('linkPlcFile' + i).innerHTML = ''; }
+    if (id) {
+      var r = allPLC.find(function(x) { return x['ID'] === id; });
+      if (r) {
+        document.getElementById('plcId').value = r['ID'];
+        var d = r['วันที่']; if (d && d.includes('/')) { var p = d.split('/'); d = p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0'); }
+        document.getElementById('plcDate').value = d;
+        document.getElementById('plcSession').value = r['ครั้งที่'];
+        document.getElementById('plcYear').value = r['ปีการศึกษา'];
+        document.getElementById('plcSemester').value = r['ภาคเรียน'] || '1';
+        document.getElementById('plcHours').value = r['จำนวนชั่วโมง'];
+        document.getElementById('plcGroup').value = r['ชื่อกลุ่ม/ทีม PLC'];
+        document.getElementById('plcRole').value = r['บทบาทของตนเอง'] || 'สมาชิกกลุ่ม PLC';
+        document.getElementById('plcMembers').value = r['สมาชิกที่เข้าร่วม'];
+        document.getElementById('plcTopic').value = r['ประเด็นปัญหา/หัวข้อที่ประชุม'];
+        document.getElementById('plcGoal').value = r['เป้าหมายการพัฒนา'];
+        document.getElementById('plcProcess').value = r['กระบวนการ/สรุปการประชุม'];
+        document.getElementById('plcSolution').value = r['แนวทาง/ข้อตกลงที่ได้'];
+        document.getElementById('plcResult').value = r['การนำไปใช้และผลลัพธ์'];
+        for (var i = 1; i <= 5; i++) {
+          var img = r['ภาพที่ ' + i] || ''; document.getElementById('exPlcImg' + i).value = img; document.getElementById('linkPlcImg' + i).innerHTML = img ? '<a href="' + img + '" target="_blank" class="badge bg-info mt-1">🖼️ ดูภาพเดิม</a>' : '';
+          var u = r['ไฟล์แนบ ' + i] || ''; document.getElementById('exPlcFile' + i).value = u; document.getElementById('linkPlcFile' + i).innerHTML = u ? '<a href="' + u + '" target="_blank" class="badge bg-info mt-1">📄 ดูไฟล์เดิม</a>' : '';
+        }
+        document.getElementById('plcModalTitle').innerText = '✏️ แก้ไขบันทึก PLC ครั้งที่ ' + r['ครั้งที่'];
+        document.getElementById('btnSavePLC').innerHTML = '✅ อัปเดต PLC';
+      }
+    }
+    document.querySelectorAll('#plcModalTabs .nav-link').forEach(function(b,i){ b.classList.toggle('active', i===0); });
+    document.querySelectorAll('#plcModal .tab-pane').forEach(function(p,i){ p.classList.toggle('show', i===0); p.classList.toggle('active', i===0); });
+    plcModal.show();
+  }
+
+  function savePLCForm(e, form) {
+    e.preventDefault();
+    var imgsArray = [form.plcImg1, form.plcImg2, form.plcImg3, form.plcImg4, form.plcImg5];
+    for (var i = 0; i < 5; i++) { if (imgsArray[i].files.length > 0 && imgsArray[i].files[0].size > 10 * 1024 * 1024) { Swal.fire('ไฟล์ใหญ่เกินไป', 'ภาพที่ ' + (i+1) + ' มีขนาดเกิน 10MB', 'warning'); return; } }
+    var filesArray = [form.plcFile1, form.plcFile2, form.plcFile3, form.plcFile4, form.plcFile5];
+    for (var i = 0; i < 5; i++) { if (filesArray[i].files.length > 0 && filesArray[i].files[0].size > 10 * 1024 * 1024) { Swal.fire('ไฟล์ใหญ่เกินไป', 'ไฟล์แนบที่ ' + (i+1) + ' มีขนาดเกิน 10MB', 'warning'); return; } }
+    document.getElementById('btnSavePLC').disabled = true;
+    google.script.run.withSuccessHandler(function(res) {
+      document.getElementById('btnSavePLC').disabled = false;
+      plcModal.hide(); Swal.fire('สำเร็จ', res, 'success'); loadPLCData(); updatePLCYearList();
+    }).withFailureHandler(function(err) { document.getElementById('btnSavePLC').disabled = false; Swal.fire('ล้มเหลว', err.message, 'error'); }).savePLCRecord(form);
+  }
+
+  function confirmDeletePLC(id) {
+    Swal.fire({ title: 'ยืนยันการลบบันทึก PLC?', text: 'ลบแล้วกู้คืนไม่ได้นะครับ', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'ลบเลย', cancelButtonText: 'ยกเลิก' })
+    .then(function(r) { if (r.isConfirmed) google.script.run.withSuccessHandler(function() { Swal.fire('ลบแล้ว!', '', 'success'); loadPLCData(); updatePLCYearList(); }).deletePLCRecord(id); });
+  }
+
+  function exportPLCReport() {
+    var year = document.getElementById('plcYearFilter').value;
+    Swal.fire({ title: 'กำลังสร้างรายงาน PLC...', text: 'รวบรวมบันทึกทั้งหมดและรูปภาพ อาจใช้เวลาสักครู่ 🤝✨', allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+    google.script.run.withSuccessHandler(function(url) {
+      Swal.fire({ title: 'สร้างรายงาน PLC สำเร็จ! 🎉', text: 'เปิดไฟล์ Word เพื่อดาวน์โหลดหรือส่งประเมินได้เลยครับ', icon: 'success', showCancelButton: true, confirmButtonText: 'เปิดไฟล์', cancelButtonText: 'ปิดหน้าต่าง', confirmButtonColor: '#0ea5e9' })
+      .then(function(result) { if (result.isConfirmed) window.open(url, '_blank'); });
+    }).withFailureHandler(function(err) { Swal.fire('เกิดข้อผิดพลาด', err.message, 'error'); }).exportPLCToDoc(year);
+  }
+</script>
+</body>
+</html>
