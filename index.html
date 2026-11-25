@@ -63,6 +63,15 @@ tr.overdue-row td:first-child::after { content: " ⚠️"; }
   .topbar-mobile{ display:flex; }
   .sidebar-backdrop.show{ display:block; }
   .report-print-area { padding: 10px; } .report-img { height: 150px; } .fc-toolbar { flex-direction: column; gap: 10px; font-size: 0.9rem; } .stat-card .stat-value { font-size: 1.4rem; }
+  .fc-toolbar-title { font-size: 1.05rem !important; }
+  .fc-col-header-cell-cushion { font-size: 11px; padding: 2px !important; }
+  .fc-daygrid-day-number { font-size: 11px; padding: 2px 4px !important; }
+  .fc-daygrid-day-frame { min-height: 56px; }
+  .fc-event { font-size: 10px; padding: 0 2px; }
+  .fc-event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fc-more-link { font-size: 10px; }
+  .fc-daygrid-event-harness { margin-top: 1px !important; }
+  .fc .fc-button { padding: 4px 8px; font-size: 12px; }
 }
 @media print { .app-sidebar, .topbar-mobile, .sidebar-backdrop { display:none !important; } .app-main{ margin-left:0; } }
 </style>
@@ -501,8 +510,9 @@ function initCalendar() {
   callApi('getCalendarEvents').then(function(ev) {
     var isMobile = window.innerWidth < 768;
     calendar = new FullCalendar.Calendar(el, {
-      initialView: isMobile ? 'listWeek' : 'dayGridMonth', locale: 'th', events: ev, height: 'auto',
-      headerToolbar: isMobile ? { left: 'prev,next', center: 'title', right: 'today' } : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek,listWeek' },
+      initialView: 'dayGridMonth', locale: 'th', events: ev, height: 'auto',
+      headerToolbar: isMobile ? { left: 'prev,next today', center: 'title', right: '' } : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek,listWeek' },
+      dayMaxEvents: isMobile ? 2 : true,
       dateClick: function(info) { resetForm(); document.getElementById('date').value = info.dateStr; showPage('dashboard'); },
       eventClick: function(info) {
         const props = info.event.extendedProps; let fileLinksHtml = '';
